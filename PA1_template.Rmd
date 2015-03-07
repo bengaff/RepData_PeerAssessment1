@@ -8,18 +8,161 @@ output:
 
 ## Loading and preprocessing the data
 
+The first step in this exercise is to load the data from the file "activity.csv". This file is contained
+in the zip file "activity.zip", which is included in this repo, and has been copied to the directory
+shown in the first line of code below. 
+  
+The code loads this file and stores it in a data table called `dt`.  
+
+```{r loadcsv}
+setwd("~/Documents/coursera/r/5.ReproducibleResearch/Assessment1")
+library(data.table)
+dt <- fread("activity.csv")
+```
 
 
 ## What is mean total number of steps taken per day?
 
+*Please note that missing values in the dataset are ignored for this part of the assignment*  
+  
+1. Total number of steps taken per day  
+  
+  The first piece of analysis undertaken is to calculate the total number of steps taken per day 
+  observed within the data. This has been saved to the aggregated table `DateTable` for use in 
+  subsequent analysis. 
+  
+```{r totalstepsperday} 
+DateTable <- dt[ , list(TotalSteps=sum(steps)), by=date]
+head(DateTable)
+```
+  
+2. Histogram of the total number of steps taken each day  
+  
+  Next we show a histogram of these daily step totals in the following plot. The plot
+  does not include any special formatting since this is just designed to give a quick view of the 
+  distribution of daily steps totals.
 
+```{r totalstepshist}
+hist(DateTable$TotalSteps)
+```
 
+3. Mean and median of the total number of steps taken per day  
+  
+  Finally within this section we calculate the mean and median statistics for the total number of
+  steps taken per day as follows.
+```{r totalmean&median}
+mean(DateTable$TotalSteps,na.rm=TRUE)
+median(DateTable$TotalSteps,na.rm=TRUE)
+```
+
+  
+  
+  
 ## What is the average daily activity pattern?
-
-
-
+  
+  1. Time series plot of the 5-minute interval (x-axis) and the average number of steps taken,
+  averaged across all days (y-axis)  
+  
+  We use the following code to create the data table `IntervalTable`, which calculates the average 
+  number of steps taken for each of the 5-minute intervals across the data.
+```{r intervaltable}
+IntervalTable <- dt[ , list(AverageSteps=mean(steps,na.rm=TRUE)), by=interval]
+```
+  
+  We can then plot this data using the following command to show how, on average across all days in
+  the data, the number of steps changes across the course of a day.  
+```{r intervalplot}
+plot(IntervalTable$interval, IntervalTable$AverageSteps, type="l")
+```
+  
+  
+  2. Which 5-minute interval, on average across all the days in the dataset, contains the maximum number of steps?  
+  
+  We can see that the average number of steps peaks before 1000 in the plot above and can use the 
+  following code to establish exactly which interval has the highest average number of steps. 
+  The interval is 835, which equates to the time between 08:35 and 08:40 in the morning.
+```{r intervalmax}
+IntervalTable[which.max(IntervalTable$AverageSteps),]
+```
+  
+  
+  
 ## Imputing missing values
+  1. Total number of missing values in the dataset  
+  
+  We can use the following code to understand how many NA (missing) values are included in the steps variable.  
+```{r sumnas}
+sum(is.na(dt$steps))
+```
+    
+  2. Strategy for filling in all of the missing values in the dataset. 
+  
+  We can fill in missing values in the dataset by replacing missing values with the median value of 
+  the steps variable (for non-missing values) for rows with the same 5-minute interval using the 
+  following code.
+```{r  imputecode, eval=FALSE}
+dt[ ,steps := ifelse(is.na(steps), median(steps, na.rm=TRUE), steps), by=interval]
+```
 
+  3. New dataset that is equal to the original dataset, but with the missing data filled in.
+  
+  The following code creates a new data table `dt2`, which is the same as the original dataset, but
+  with the missing data filled in using the strategy defined above.  
+```{r createdt2}
+dt2 <- copy(dt)
+dt2[ ,steps := ifelse(is.na(steps), median(steps, na.rm=TRUE), steps), by=interval]
+```
+  
+  4. Impact of imputing missing data on the estimates of the total daily number of steps  
+  
+  We can create a histogram of the new steps variable using the following code to see how the 
+  strategy for filling in missing values has affected the distribution of values using the following 
+  code. First we create new aggregated sums for the steps variable in `DateTable2` and then plot it.
+  We also calculate the mean and median total number of steps taken per day using the imputed data.
+```{r stepshist2&medianmean}
+DateTable2 <- dt2[ , list(TotalSteps=sum(steps)), by=date]
+hist(DateTable2$TotalSteps)
+mean(DateTable2$TotalSteps,na.rm=TRUE)
+median(DateTable2$TotalSteps,na.rm=TRUE)
+```
 
+The histogram shows that the effect of filling in missing values using the strategy defined above has to been to significantly increase the number of observations with values lower than 5,000. This is reflected in the decrease in mean values for the steps variable from 10,766 to 9,504 and the fall in median values from 10,765 to 10,395.  
+  
 
-## Are there differences in activity patterns between weekdays and weekends?
+## Are there differences in activity patterns between weekdays and weekends?  
+  1. New factor variable indicating whether a given date is a weekday or weekend day.
+  
+  In order to understand how activity patterns vary between weekdays and weekends the following
+  code creates a factor variable in the `dt2` dataset with two levels - "weekday" and "weekend".  
+```{r createDateType}
+dt2[ ,DateType := factor(ifelse(weekdays(strptime(dt2$date,"%Y-%m-%d")) %in% c("Saturday","Sunday"),
+                                "weekend","weekday")), ]
+
+```
+
+  2. Panel plot of the 5-minute interval vs. the average number of steps taken, averaged across all 
+  weekday days or weekend days.  
+  
+  In order to visualise the data the following code first creates a new table `DateTypeAverages`, 
+  which stores the average number of steps per interval for dates that are weekdays and for dates
+  that are in the weekend. Data from the new table is then used to create a panel plot with two 
+  plots showing the average number of steps in the y axis vs. the 5 minute interval.  
+```{r createFinalData&Charts}  
+DateTypeAverages <- dt2[ , list(AverageSteps=mean(steps)), by=.(interval,DateType)]
+
+library(lattice)
+xyplot(AverageSteps ~ interval|DateType, 
+       data = DateTypeAverages,
+       type = "l",
+       xlab = "Interval",
+       ylab = "Number of steps",
+       layout=c(1,2))
+```  
+
+  These plots show that observations during weekdays show a lower number of steps on average between
+  about 9am and 5pm. 
+  
+  
+  
+  
+  
